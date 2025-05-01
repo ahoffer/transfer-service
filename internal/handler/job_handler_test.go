@@ -13,8 +13,9 @@ import (
 )
 
 func TestJobHandler_CreateJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	reqBody := `{
@@ -42,8 +43,9 @@ func TestJobHandler_CreateJob(t *testing.T) {
 }
 
 func TestJobHandler_GetJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	// First create a job
@@ -95,8 +97,9 @@ func TestJobHandler_GetJob(t *testing.T) {
 }
 
 func TestJobHandler_GetJob_NotFound(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	req := httptest.NewRequest("GET", "/jobs/999", nil)
@@ -111,8 +114,9 @@ func TestJobHandler_GetJob_NotFound(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	// First create a job
@@ -156,8 +160,9 @@ func TestJobHandler_CancelJob(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob_NotFound(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	req := httptest.NewRequest("DELETE", "/jobs/999", nil)
@@ -172,8 +177,9 @@ func TestJobHandler_CancelJob_NotFound(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob_MethodNotAllowed(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	jobService := service.NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	req := httptest.NewRequest("POST", "/jobs/123", nil)

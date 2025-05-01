@@ -1,27 +1,32 @@
 package service
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/transfer-service/internal/models"
 	"github.com/transfer-service/internal/repository"
 )
 
 type JobService struct {
-	repo repository.JobRepository
+	jobRepo     repository.JobRepository
+	requestRepo repository.JobRequestRepository
 }
 
-func NewJobService(repo repository.JobRepository) *JobService {
+func NewJobService(jobRepo repository.JobRepository, requestRepo repository.JobRequestRepository) *JobService {
 	return &JobService{
-		repo: repo,
+		jobRepo:     jobRepo,
+		requestRepo: requestRepo,
 	}
 }
 
 func (s *JobService) CreateJob(req *models.JobRequest) (*models.Job, error) {
+	// First, persist the request
+	if err := s.requestRepo.Create(req); err != nil {
+		return nil, fmt.Errorf("failed to create job request: %w", err)
+	}
+
+	// Then create the job
 	job := &models.Job{
 		Name:           req.Name,
 		SourceUrl:      req.SourceUrl,
@@ -30,7 +35,7 @@ func (s *JobService) CreateJob(req *models.JobRequest) (*models.Job, error) {
 		Status:         "created",
 	}
 
-	if err := s.repo.Create(job); err != nil {
+	if err := s.jobRepo.Create(job); err != nil {
 		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
 
@@ -38,7 +43,7 @@ func (s *JobService) CreateJob(req *models.JobRequest) (*models.Job, error) {
 }
 
 func (s *JobService) GetJob(id uint) (*models.Job, error) {
-	job, err := s.repo.GetByID(id)
+	job, err := s.jobRepo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, repository.ErrRecordNotFound) {
 			return nil, errors.New("job not found")
@@ -49,7 +54,7 @@ func (s *JobService) GetJob(id uint) (*models.Job, error) {
 }
 
 func (s *JobService) CancelJob(id uint) error {
-	job, err := s.repo.GetByID(id)
+	job, err := s.jobRepo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, repository.ErrRecordNotFound) {
 			return errors.New("job not found")
@@ -58,7 +63,7 @@ func (s *JobService) CancelJob(id uint) error {
 	}
 
 	job.Status = "cancelled"
-	if err := s.repo.Update(job); err != nil {
+	if err := s.jobRepo.Update(job); err != nil {
 		return fmt.Errorf("failed to update job: %w", err)
 	}
 
@@ -66,14 +71,5 @@ func (s *JobService) CancelJob(id uint) error {
 }
 
 func (s *JobService) ListJobs() ([]*models.Job, error) {
-	return s.repo.List()
-}
-
-func generateJobID() string {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		// If we can't generate random bytes, use timestamp as fallback
-		return fmt.Sprintf("%x", time.Now().UnixNano())
-	}
-	return hex.EncodeToString(b)
+	return s.jobRepo.List()
 }

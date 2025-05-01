@@ -31,13 +31,19 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Initialize repository and service
+	// Initialize repositories
 	jobRepo := repository.NewJobRepository(db)
+	requestRepo := repository.NewJobRequestRepository(db)
+
+	// Migrate both repositories
 	if err := jobRepo.Migrate(); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		log.Fatalf("Failed to migrate job table: %v", err)
+	}
+	if err := requestRepo.Migrate(); err != nil {
+		log.Fatalf("Failed to migrate job request table: %v", err)
 	}
 
-	jobService := service.NewJobService(jobRepo)
+	jobService := service.NewJobService(jobRepo, requestRepo)
 	jobHandler := handler.NewJobHandler(jobService, "/jobs")
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

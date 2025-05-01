@@ -8,8 +8,9 @@ import (
 )
 
 func TestJobService_CreateJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	service := NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	service := NewJobService(jobRepo, requestRepo)
 
 	req := &models.JobRequest{
 		Name:           "Test Job",
@@ -45,8 +46,9 @@ func TestJobService_CreateJob(t *testing.T) {
 }
 
 func TestJobService_GetJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	service := NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	service := NewJobService(jobRepo, requestRepo)
 
 	// Create a job first
 	req := &models.JobRequest{
@@ -92,8 +94,9 @@ func TestJobService_GetJob(t *testing.T) {
 }
 
 func TestJobService_CancelJob(t *testing.T) {
-	repo := repository.NewMockJobRepository()
-	service := NewJobService(repo)
+	jobRepo := repository.NewMockJobRepository()
+	requestRepo := repository.NewMockJobRequestRepository()
+	service := NewJobService(jobRepo, requestRepo)
 
 	// Create a job first
 	req := &models.JobRequest{

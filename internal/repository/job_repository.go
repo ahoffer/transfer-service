@@ -9,6 +9,50 @@ import (
 
 var ErrRecordNotFound = errors.New("record not found")
 
+type JobRequestRepository interface {
+	Create(request *models.JobRequest) error
+	GetByID(id uint) (*models.JobRequest, error)
+	List() ([]*models.JobRequest, error)
+	Migrate() error
+}
+
+type GormJobRequestRepository struct {
+	db *gorm.DB
+}
+
+func NewJobRequestRepository(db *gorm.DB) JobRequestRepository {
+	return &GormJobRequestRepository{db: db}
+}
+
+func (r *GormJobRequestRepository) Create(request *models.JobRequest) error {
+	return r.db.Create(request).Error
+}
+
+func (r *GormJobRequestRepository) GetByID(id uint) (*models.JobRequest, error) {
+	var request models.JobRequest
+	err := r.db.First(&request, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return &request, nil
+}
+
+func (r *GormJobRequestRepository) List() ([]*models.JobRequest, error) {
+	var requests []*models.JobRequest
+	err := r.db.Find(&requests).Error
+	if err != nil {
+		return nil, err
+	}
+	return requests, nil
+}
+
+func (r *GormJobRequestRepository) Migrate() error {
+	return r.db.AutoMigrate(&models.JobRequest{})
+}
+
 type JobRepository interface {
 	Create(job *models.Job) error
 	GetByID(id uint) (*models.Job, error)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/transfer-service/internal/models"
 	"github.com/transfer-service/internal/service"
@@ -34,6 +35,9 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Set the creation timestamp
+	req.CreatedAt = time.Now()
 
 	job, err := h.jobService.CreateJob(&req)
 	if err != nil {
