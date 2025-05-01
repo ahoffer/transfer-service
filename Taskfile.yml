@@ -49,6 +49,16 @@ tasks:
     cmds:
       - go run main.go
 
+  up:
+    desc: Start the application and database using Docker Compose
+    cmds:
+      - docker compose up -d
+
+  down:
+    desc: Stop and remove the Docker Compose services
+    cmds:
+      - docker compose down
+
   default:
     desc: Default task - clean, format, build, test, and create Docker image
     deps: [clean, build, test, docker] 
