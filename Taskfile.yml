@@ -1,0 +1,54 @@
+version: '3'
+
+vars:
+  BINARY_NAME: transfer-service
+  DOCKER_IMAGE: transfer-service
+
+tasks:
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - go clean
+      - rm -f {{.BINARY_NAME}}
+
+  build:
+    desc: Build the application
+    deps: [format]
+    cmds:
+      - go build -o {{.BINARY_NAME}} ./cmd/...
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v ./...
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run
+
+  format:
+    desc: Format Go code
+    cmds:
+      - gofmt -w .
+      - goimports -w .
+
+  docker:
+    desc: Build Docker image
+    deps: [test]
+    cmds:
+      - docker build -t {{.DOCKER_IMAGE}} .
+
+  run:
+    desc: Run the application
+    cmds:
+      - ./{{.BINARY_NAME}}
+
+  dev:
+    desc: Run the application in development mode
+    cmds:
+      - go run main.go
+
+  default:
+    desc: Default task - clean, format, build, test, and create Docker image
+    deps: [clean, build, test, docker] 
