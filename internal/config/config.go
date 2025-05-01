@@ -19,7 +19,11 @@ func Load() *Config {
 		log.Printf("Warning: .env file not found, using environment variables or defaults")
 	}
 
-	port, _ := strconv.Atoi(getEnv("PORT", "8080"))
+	portStr := getEnv("PORT", "8080")
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		port = 8080 // Fallback to default port if parsing fails
+	}
 
 	return &Config{
 		Port:     port,
