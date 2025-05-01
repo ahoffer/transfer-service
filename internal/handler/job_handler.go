@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/transfer-service/internal/models"
@@ -40,7 +42,7 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set Location header with full URL
-	location := h.baseURL + "/jobs/" + job.ID
+	location := fmt.Sprintf("%s/jobs/%d", h.baseURL, job.ID)
 	w.Header().Set("Location", location)
 	w.WriteHeader(http.StatusCreated)
 }
@@ -57,9 +59,13 @@ func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid job ID", http.StatusBadRequest)
 		return
 	}
-	jobID := pathParts[2]
+	jobID, err := strconv.ParseUint(pathParts[2], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
 
-	job, err := h.jobService.GetJob(jobID)
+	job, err := h.jobService.GetJob(uint(jobID))
 	if err != nil {
 		http.Error(w, "Job not found", http.StatusNotFound)
 		return
@@ -84,9 +90,13 @@ func (h *JobHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid job ID", http.StatusBadRequest)
 		return
 	}
-	jobID := pathParts[2]
+	jobID, err := strconv.ParseUint(pathParts[2], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
 
-	err := h.jobService.CancelJob(jobID)
+	err = h.jobService.CancelJob(uint(jobID))
 	if err != nil {
 		http.Error(w, "Job not found", http.StatusNotFound)
 		return

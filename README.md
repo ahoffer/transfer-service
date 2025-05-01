@@ -9,11 +9,21 @@ The service can be configured using environment variables:
 - `PORT`: Server port (default: 8080)
 - `BASE_URL`: Base URL for the service (default: http://localhost:8080)
 - `LOG_LEVEL`: Logging level (default: info)
+- `DB_HOST`: Database host (default: localhost)
+- `DB_PORT`: Database port (default: 5432)
+- `DB_USER`: Database user (default: postgres)
+- `DB_PASSWORD`: Database password (default: postgres)
+- `DB_NAME`: Database name (default: transfer_service)
 
 Example:
 ```bash
 export PORT=9090
 export LOG_LEVEL=debug
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=postgres
+export DB_PASSWORD=secret
+export DB_NAME=transfer_service
 ```
 
 ## Development
@@ -74,5 +84,11 @@ task lint
 Build and run using Docker:
 ```bash
 task docker
-docker run -p 8080:8080 transfer-service
+docker run -p 8080:8080 \
+  -e DB_HOST=host.docker.internal \
+  -e DB_PORT=5432 \
+  -e DB_USER=postgres \
+  -e DB_PASSWORD=secret \
+  -e DB_NAME=transfer_service \
+  transfer-service
 ``` 

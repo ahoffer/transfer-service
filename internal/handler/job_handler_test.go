@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/transfer-service/internal/models"
+	"github.com/transfer-service/internal/repository"
 	"github.com/transfer-service/internal/service"
 )
 
 func TestJobHandler_CreateJob(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	reqBody := `{
 		"name": "Test Job",
@@ -37,17 +39,12 @@ func TestJobHandler_CreateJob(t *testing.T) {
 	if !strings.HasPrefix(location, "http://localhost:8080/jobs/") {
 		t.Errorf("Expected Location header to start with 'http://localhost:8080/jobs/', got %q", location)
 	}
-
-	// Extract job ID from location
-	jobID := strings.TrimPrefix(location, "http://localhost:8080/jobs/")
-	if len(jobID) != 16 {
-		t.Errorf("Expected job ID length 16, got %d", len(jobID))
-	}
 }
 
 func TestJobHandler_GetJob(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	// First create a job
 	reqBody := `{
@@ -98,10 +95,11 @@ func TestJobHandler_GetJob(t *testing.T) {
 }
 
 func TestJobHandler_GetJob_NotFound(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
-	req := httptest.NewRequest("GET", "/jobs/nonexistent", nil)
+	req := httptest.NewRequest("GET", "/jobs/999", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetJob(w, req)
@@ -113,8 +111,9 @@ func TestJobHandler_GetJob_NotFound(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	// First create a job
 	reqBody := `{
@@ -157,10 +156,11 @@ func TestJobHandler_CancelJob(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob_NotFound(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
-	req := httptest.NewRequest("DELETE", "/jobs/nonexistent", nil)
+	req := httptest.NewRequest("DELETE", "/jobs/999", nil)
 	w := httptest.NewRecorder()
 
 	handler.CancelJob(w, req)
@@ -172,8 +172,9 @@ func TestJobHandler_CancelJob_NotFound(t *testing.T) {
 }
 
 func TestJobHandler_CancelJob_MethodNotAllowed(t *testing.T) {
-	service := service.NewJobService()
-	handler := NewJobHandler(service, "http://localhost:8080")
+	repo := repository.NewMockJobRepository()
+	jobService := service.NewJobService(repo)
+	handler := NewJobHandler(jobService, "http://localhost:8080")
 
 	req := httptest.NewRequest("POST", "/jobs/123", nil)
 	w := httptest.NewRecorder()

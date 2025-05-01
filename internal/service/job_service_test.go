@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"github.com/transfer-service/internal/models"
+	"github.com/transfer-service/internal/repository"
 )
 
 func TestJobService_CreateJob(t *testing.T) {
-	service := NewJobService()
+	repo := repository.NewMockJobRepository()
+	service := NewJobService(repo)
 
 	req := &models.JobRequest{
 		Name:           "Test Job",
@@ -40,13 +42,11 @@ func TestJobService_CreateJob(t *testing.T) {
 	if job.CreatedAt.IsZero() {
 		t.Error("Expected CreatedAt to be set")
 	}
-	if len(job.ID) != 16 { // 8 bytes = 16 hex chars
-		t.Errorf("Expected ID length 16, got %d", len(job.ID))
-	}
 }
 
 func TestJobService_GetJob(t *testing.T) {
-	service := NewJobService()
+	repo := repository.NewMockJobRepository()
+	service := NewJobService(repo)
 
 	// Create a job first
 	req := &models.JobRequest{
@@ -69,7 +69,7 @@ func TestJobService_GetJob(t *testing.T) {
 
 	// Verify the job matches what we created
 	if job.ID != createdJob.ID {
-		t.Errorf("Expected job ID %q, got %q", createdJob.ID, job.ID)
+		t.Errorf("Expected job ID %d, got %d", createdJob.ID, job.ID)
 	}
 	if job.Name != req.Name {
 		t.Errorf("Expected job name %q, got %q", req.Name, job.Name)
@@ -85,14 +85,15 @@ func TestJobService_GetJob(t *testing.T) {
 	}
 
 	// Test getting non-existent job
-	_, err = service.GetJob("nonexistent")
+	_, err = service.GetJob(999)
 	if err == nil {
 		t.Error("Expected error when getting non-existent job")
 	}
 }
 
 func TestJobService_CancelJob(t *testing.T) {
-	service := NewJobService()
+	repo := repository.NewMockJobRepository()
+	service := NewJobService(repo)
 
 	// Create a job first
 	req := &models.JobRequest{
@@ -123,7 +124,7 @@ func TestJobService_CancelJob(t *testing.T) {
 	}
 
 	// Test canceling non-existent job
-	err = service.CancelJob("nonexistent")
+	err = service.CancelJob(999)
 	if err == nil {
 		t.Error("Expected error when canceling non-existent job")
 	}

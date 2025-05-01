@@ -11,6 +11,15 @@ import (
 type Config struct {
 	Port     int
 	LogLevel string
+	DBConfig DBConfig
+}
+
+type DBConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Name     string
 }
 
 func Load() *Config {
@@ -28,6 +37,13 @@ func Load() *Config {
 	return &Config{
 		Port:     port,
 		LogLevel: getEnv("LOG_LEVEL", "info"),
+		DBConfig: DBConfig{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnv("DB_PORT", "5432"),
+			User:     getEnv("DB_USER", "postgres"),
+			Password: getEnv("DB_PASSWORD", "postgres"),
+			Name:     getEnv("DB_NAME", "transfer_service"),
+		},
 	}
 }
 

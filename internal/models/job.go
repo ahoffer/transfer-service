@@ -1,7 +1,7 @@
 package models
 
 import (
-	"time"
+	"gorm.io/gorm"
 )
 
 // JobRequest represents the incoming request to create a new transfer job
@@ -14,8 +14,10 @@ type JobRequest struct {
 
 // Job represents a transfer job in the system
 type Job struct {
-	ID        string    `json:"id"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
-	JobRequest
+	gorm.Model
+	Name           string `json:"name" gorm:"not null"`
+	SourceUrl      string `json:"sourceUrl" gorm:"not null"`
+	Destination    string `json:"destination" gorm:"not null"`
+	DestinationUrl string `json:"destinationUrl" gorm:"not null"`
+	Status         string `json:"status" gorm:"not null;default:'created'"`
 }
