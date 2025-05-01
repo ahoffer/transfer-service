@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/transfer-service/internal/config"
 	"github.com/transfer-service/internal/handler"
@@ -44,22 +45,47 @@ func main() {
 	}
 
 	jobService := service.NewJobService(jobRepo, requestRepo)
-	jobHandler := handler.NewJobHandler(jobService, "/jobs")
+	jobHandler := handler.NewJobHandler(jobService, "http://localhost:8080/jobs")
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Service is healthy")
 	})
 
-	http.HandleFunc("/jobs", jobHandler.CreateJob)
-	http.HandleFunc("/jobs/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			jobHandler.GetJob(w, r)
-		case http.MethodDelete:
-			jobHandler.CancelJob(w, r)
-		default:
+	// Handle job creation
+	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
+		jobHandler.CreateJob(w, r)
+	})
+
+	// Handle job operations (get, cancel)
+	http.HandleFunc("/jobs/", func(w http.ResponseWriter, r *http.Request) {
+		pathParts := strings.Split(r.URL.Path, "/")
+		if len(pathParts) < 3 {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+
+		// Handle cancel endpoint
+		if len(pathParts) == 4 && pathParts[3] == "cancel" {
+			if r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			jobHandler.CancelJob(w, r)
+			return
+		}
+
+		// Handle get job
+		if r.Method == http.MethodGet {
+			jobHandler.GetJob(w, r)
+			return
+		}
+
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	})
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

@@ -15,6 +15,7 @@ tasks:
     desc: Build the application
     deps: [format]
     cmds:
+      - go mod tidy
       - go build -o {{.BINARY_NAME}} ./cmd/...
 
   test:
@@ -35,7 +36,6 @@ tasks:
 
   docker:
     desc: Build Docker image
-    deps: [test]
     cmds:
       - docker build -t {{.DOCKER_IMAGE}} .
 
@@ -58,6 +58,14 @@ tasks:
     desc: Stop and remove the Docker Compose services
     cmds:
       - docker compose down
+
+  redeploy:
+    desc: Rebuild and redeploy the application (down, build, docker, up)
+    cmds:
+      - task: down
+      - task: build
+      - task: docker
+      - task: up
 
   default:
     desc: Default task - clean, format, build, test, and create Docker image

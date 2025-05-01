@@ -36,6 +36,24 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate required fields
+	if req.Name == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if req.SourceUrl == "" {
+		http.Error(w, "SourceUrl is required", http.StatusBadRequest)
+		return
+	}
+	if req.Destination == "" {
+		http.Error(w, "Destination is required", http.StatusBadRequest)
+		return
+	}
+	if req.DestinationUrl == "" {
+		http.Error(w, "DestinationUrl is required", http.StatusBadRequest)
+		return
+	}
+
 	// Set the creation timestamp
 	req.CreatedAt = time.Now()
 
@@ -46,9 +64,14 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set Location header with full URL
-	location := fmt.Sprintf("%s/jobs/%d", h.baseURL, job.ID)
+	location := fmt.Sprintf("/jobs/%d", job.ID)
 	w.Header().Set("Location", location)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(job); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +82,7 @@ func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 
 	// Extract job ID from URL path
 	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) != 3 {
+	if len(pathParts) < 3 {
 		http.Error(w, "Invalid job ID", http.StatusBadRequest)
 		return
 	}
@@ -83,14 +106,14 @@ func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *JobHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Extract job ID from URL path
 	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) != 3 {
+	if len(pathParts) < 4 {
 		http.Error(w, "Invalid job ID", http.StatusBadRequest)
 		return
 	}
@@ -100,11 +123,25 @@ func (h *JobHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.jobService.CancelJob(uint(jobID))
-	if err != nil {
-		http.Error(w, "Job not found", http.StatusNotFound)
+	if err := h.jobService.CancelJob(uint(jobID)); err != nil {
+		if err.Error() == "job not found" {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to cancel job", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Get the updated job to return in response
+	job, err := h.jobService.GetJob(uint(jobID))
+	if err != nil {
+		http.Error(w, "Failed to get updated job", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(job); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
