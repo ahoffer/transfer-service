@@ -12,16 +12,26 @@ tasks:
       - rm -f {{.BINARY_NAME}}
 
   build:
-    desc: Build the application
+    desc: Build the application with debugging symbols
     deps: [format]
     cmds:
       - go mod tidy
-      - go build -o {{.BINARY_NAME}} ./cmd/...
+      - CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o {{.BINARY_NAME}} ./cmd/...
+
+  attach-debugger:
+    desc: Attach debugger to the running container
+    cmds:
+      - dlv exec ./{{.BINARY_NAME}} --headless --listen=:2345 --api-version=2 --accept-multiclient
 
   test:
     desc: Run tests
     cmds:
       - go test -v ./...
+
+  itest:
+    desc: Run only the integration test
+    cmds:
+      - go test -v ./integration_test.go
 
   lint:
     desc: Run linter
@@ -36,6 +46,7 @@ tasks:
 
   docker:
     desc: Build Docker image
+    deps: [build]
     cmds:
       - docker build -t {{.DOCKER_IMAGE}} .
 
@@ -59,11 +70,9 @@ tasks:
     cmds:
       - docker compose down
 
-  redeploy:
-    desc: Rebuild and redeploy the application (down, build, docker, up)
+  deploy:
+    desc: Rebuild and deploy the application 
     cmds:
-      - task: down
-      - task: build
       - task: docker
       - task: up
 
