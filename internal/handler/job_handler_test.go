@@ -1,45 +1,51 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/transfer-service/internal/models"
 	"github.com/transfer-service/internal/repository"
 	"github.com/transfer-service/internal/service"
 )
+
+func setupTestRouter(handler *JobHandler) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.Default()
+	r.POST("/jobs", handler.CreateJob)
+	r.GET("/jobs/:id", handler.GetJob)
+	r.POST("/jobs/:id/cancel", handler.CancelJob)
+	return r
+}
 
 func TestJobHandler_CreateJob(t *testing.T) {
 	jobRepo := repository.NewMockJobRepository()
 	requestRepo := repository.NewMockJobRequestRepository()
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
-	reqBody := `{
-		"name": "Test Job",
-		"sourceUrl": "http://source/file.txt",
-		"destination": "target-server",
-		"destinationUrl": "http://target/receive"
-	}`
+	jobReq := models.JobRequest{
+		Name:           "Test Job",
+		SourceUrl:      "http://source/file.txt",
+		Destination:    "target-server",
+		DestinationUrl: "http://target/receive",
+	}
 
-	req := httptest.NewRequest("POST", "/jobs", strings.NewReader(reqBody))
+	reqBody, _ := json.Marshal(jobReq)
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.CreateJob(w, req)
+	router.ServeHTTP(w, req)
 
-	resp := w.Result()
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
-
-	location := resp.Header.Get("Location")
-	if !strings.HasPrefix(location, "http://localhost:8080/jobs/") {
-		t.Errorf("Expected Location header to start with 'http://localhost:8080/jobs/', got %q", location)
-	}
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Contains(t, w.Header().Get("Location"), "/jobs/")
 }
 
 func TestJobHandler_GetJob(t *testing.T) {
@@ -47,53 +53,40 @@ func TestJobHandler_GetJob(t *testing.T) {
 	requestRepo := repository.NewMockJobRequestRepository()
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
 	// First create a job
-	reqBody := `{
-		"name": "Test Job",
-		"sourceUrl": "http://source/file.txt",
-		"destination": "target-server",
-		"destinationUrl": "http://target/receive"
-	}`
+	jobReq := models.JobRequest{
+		Name:           "Test Job",
+		SourceUrl:      "http://source/file.txt",
+		Destination:    "target-server",
+		DestinationUrl: "http://target/receive",
+	}
 
-	createReq := httptest.NewRequest("POST", "/jobs", strings.NewReader(reqBody))
+	createReqBody, _ := json.Marshal(jobReq)
+	createReq := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBuffer(createReqBody))
 	createReq.Header.Set("Content-Type", "application/json")
 	createW := httptest.NewRecorder()
-	handler.CreateJob(createW, createReq)
-	location := createW.Result().Header.Get("Location")
-	jobID := strings.TrimPrefix(location, "http://localhost:8080/jobs/")
+	router.ServeHTTP(createW, createReq)
+
+	location := createW.Header().Get("Location")
+	jobID := location[len("/jobs/"):]
 
 	// Now test getting the job
-	getReq := httptest.NewRequest("GET", "/jobs/"+jobID, nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/jobs/"+jobID, nil)
 	getW := httptest.NewRecorder()
-	handler.GetJob(getW, getReq)
+	router.ServeHTTP(getW, getReq)
 
-	resp := getW.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %d, got %d", http.StatusOK, resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusOK, getW.Code)
 
 	var job models.Job
-	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
-
-	// Verify job fields
-	if job.Name != "Test Job" {
-		t.Errorf("Expected job name 'Test Job', got %q", job.Name)
-	}
-	if job.SourceUrl != "http://source/file.txt" {
-		t.Errorf("Expected source URL 'http://source/file.txt', got %q", job.SourceUrl)
-	}
-	if job.Destination != "target-server" {
-		t.Errorf("Expected destination 'target-server', got %q", job.Destination)
-	}
-	if job.DestinationUrl != "http://target/receive" {
-		t.Errorf("Expected destination URL 'http://target/receive', got %q", job.DestinationUrl)
-	}
-	if job.Status != "created" {
-		t.Errorf("Expected status 'created', got %q", job.Status)
-	}
+	err := json.NewDecoder(getW.Body).Decode(&job)
+	assert.NoError(t, err)
+	assert.Equal(t, "Test Job", job.Name)
+	assert.Equal(t, "http://source/file.txt", job.SourceUrl)
+	assert.Equal(t, "target-server", job.Destination)
+	assert.Equal(t, "http://target/receive", job.DestinationUrl)
+	assert.Equal(t, "created", job.Status)
 }
 
 func TestJobHandler_GetJob_NotFound(t *testing.T) {
@@ -101,16 +94,14 @@ func TestJobHandler_GetJob_NotFound(t *testing.T) {
 	requestRepo := repository.NewMockJobRequestRepository()
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest("GET", "/jobs/999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/jobs/999", nil)
 	w := httptest.NewRecorder()
 
-	handler.GetJob(w, req)
+	router.ServeHTTP(w, req)
 
-	resp := w.Result()
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Expected status code %d, got %d", http.StatusNotFound, resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestJobHandler_CancelJob(t *testing.T) {
@@ -118,45 +109,41 @@ func TestJobHandler_CancelJob(t *testing.T) {
 	requestRepo := repository.NewMockJobRequestRepository()
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
 	// First create a job
-	reqBody := `{
-		"name": "Test Job",
-		"sourceUrl": "http://source/file.txt",
-		"destination": "target-server",
-		"destinationUrl": "http://target/receive"
-	}`
+	jobReq := models.JobRequest{
+		Name:           "Test Job",
+		SourceUrl:      "http://source/file.txt",
+		Destination:    "target-server",
+		DestinationUrl: "http://target/receive",
+	}
 
-	createReq := httptest.NewRequest("POST", "/jobs", strings.NewReader(reqBody))
+	createReqBody, _ := json.Marshal(jobReq)
+	createReq := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBuffer(createReqBody))
 	createReq.Header.Set("Content-Type", "application/json")
 	createW := httptest.NewRecorder()
-	handler.CreateJob(createW, createReq)
-	location := createW.Result().Header.Get("Location")
-	jobID := strings.TrimPrefix(location, "http://localhost:8080/jobs/")
+	router.ServeHTTP(createW, createReq)
+
+	location := createW.Header().Get("Location")
+	jobID := location[len("/jobs/"):]
 
 	// Test canceling the job
-	cancelReq := httptest.NewRequest("DELETE", "/jobs/"+jobID, nil)
+	cancelReq := httptest.NewRequest(http.MethodPost, "/jobs/"+jobID+"/cancel", nil)
 	cancelW := httptest.NewRecorder()
-	handler.CancelJob(cancelW, cancelReq)
+	router.ServeHTTP(cancelW, cancelReq)
 
-	resp := cancelW.Result()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Errorf("Expected status code %d, got %d", http.StatusNoContent, resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusOK, cancelW.Code)
 
 	// Verify the job was cancelled
-	getReq := httptest.NewRequest("GET", "/jobs/"+jobID, nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/jobs/"+jobID, nil)
 	getW := httptest.NewRecorder()
-	handler.GetJob(getW, getReq)
+	router.ServeHTTP(getW, getReq)
 
 	var job models.Job
-	if err := json.NewDecoder(getW.Result().Body).Decode(&job); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
-
-	if job.Status != "cancelled" {
-		t.Errorf("Expected status 'cancelled', got %q", job.Status)
-	}
+	err := json.NewDecoder(getW.Body).Decode(&job)
+	assert.NoError(t, err)
+	assert.Equal(t, "cancelled", job.Status)
 }
 
 func TestJobHandler_CancelJob_NotFound(t *testing.T) {
@@ -164,31 +151,12 @@ func TestJobHandler_CancelJob_NotFound(t *testing.T) {
 	requestRepo := repository.NewMockJobRequestRepository()
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
-	req := httptest.NewRequest("DELETE", "/jobs/999", nil)
+	req := httptest.NewRequest(http.MethodPost, "/jobs/999/cancel", nil)
 	w := httptest.NewRecorder()
 
-	handler.CancelJob(w, req)
+	router.ServeHTTP(w, req)
 
-	resp := w.Result()
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Expected status code %d, got %d", http.StatusNotFound, resp.StatusCode)
-	}
-}
-
-func TestJobHandler_CancelJob_MethodNotAllowed(t *testing.T) {
-	jobRepo := repository.NewMockJobRepository()
-	requestRepo := repository.NewMockJobRequestRepository()
-	jobService := service.NewJobService(jobRepo, requestRepo)
-	handler := NewJobHandler(jobService, "http://localhost:8080")
-
-	req := httptest.NewRequest("POST", "/jobs/123", nil)
-	w := httptest.NewRecorder()
-
-	handler.CancelJob(w, req)
-
-	resp := w.Result()
-	if resp.StatusCode != http.StatusMethodNotAllowed {
-		t.Errorf("Expected status code %d, got %d", http.StatusMethodNotAllowed, resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

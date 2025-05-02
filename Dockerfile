@@ -1,10 +1,21 @@
-FROM golang:1.24-alpine AS builder
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
-WORKDIR /workspace
-RUN apk add --no-cache git
+FROM golang:1.24-alpine
+
+WORKDIR /app
+
+# Copy go mod and sum files
 COPY go.mod go.sum ./
+
+# Download all dependencies
 RUN go mod download
+
+# Copy the source code
 COPY . .
-RUN go build -gcflags="all=-N -l" -o transfer-service ./cmd/server
-EXPOSE 40000
-ENTRYPOINT ["dlv", "exec", "./transfer-service", "--headless", "--listen=0.0.0.0:40000", "--api-version=2", "--accept-multiclient"]
+
+# Build the application
+RUN go build -o main ./cmd/server
+
+# Expose port 8080
+EXPOSE 8080
+
+# Command to run the executable
+CMD ["./main"]

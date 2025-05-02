@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/transfer-service/internal/config"
 	"github.com/transfer-service/internal/handler"
 	"github.com/transfer-service/internal/repository"
@@ -47,50 +47,30 @@ func main() {
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	jobHandler := handler.NewJobHandler(jobService, "http://localhost:8080/jobs")
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Service is healthy")
+	// Initialize Gin router
+	r := gin.Default()
+
+	// Add middleware
+	r.Use(gin.Recovery())
+	r.Use(gin.Logger())
+
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.String(http.StatusOK, "Service is healthy")
 	})
 
-	// Handle job creation
-	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		jobHandler.CreateJob(w, r)
-	})
+	// Job endpoints
+	jobs := r.Group("/jobs")
+	{
+		jobs.POST("", jobHandler.CreateJob)
+		jobs.GET("/:id", jobHandler.GetJob)
+		jobs.POST("/:id/cancel", jobHandler.CancelJob)
+	}
 
-	// Handle job operations (get, cancel)
-	http.HandleFunc("/jobs/", func(w http.ResponseWriter, r *http.Request) {
-		pathParts := strings.Split(r.URL.Path, "/")
-		if len(pathParts) < 3 {
-			http.Error(w, "Invalid path", http.StatusBadRequest)
-			return
-		}
-
-		// Handle cancel endpoint
-		if len(pathParts) == 4 && pathParts[3] == "cancel" {
-			if r.Method != http.MethodPost {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			jobHandler.CancelJob(w, r)
-			return
-		}
-
-		// Handle get job
-		if r.Method == http.MethodGet {
-			jobHandler.GetJob(w, r)
-			return
-		}
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	})
-
+	// Start server
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Server starting on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := r.Run(addr); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

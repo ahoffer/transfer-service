@@ -95,6 +95,7 @@ func TestJobEndpoints(t *testing.T) {
 	// Initialize the job service and handler
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
 	// Test Create Job
 	t.Run("Create Job", func(t *testing.T) {
@@ -112,7 +113,7 @@ func TestJobEndpoints(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 
-		handler.CreateJob(w, req)
+		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 		assert.Contains(t, w.Header().Get("Location"), "/jobs/")
@@ -123,7 +124,7 @@ func TestJobEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/jobs/1", nil)
 		w := httptest.NewRecorder()
 
-		handler.GetJob(w, req)
+		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -138,7 +139,7 @@ func TestJobEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/jobs/1/cancel", nil)
 		w := httptest.NewRecorder()
 
-		handler.CancelJob(w, req)
+		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
@@ -152,6 +153,7 @@ func TestJobValidation(t *testing.T) {
 	// Initialize the job service and handler
 	jobService := service.NewJobService(jobRepo, requestRepo)
 	handler := NewJobHandler(jobService, "http://localhost:8080")
+	router := setupTestRouter(handler)
 
 	tests := []struct {
 		name        string
@@ -188,7 +190,7 @@ func TestJobValidation(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			handler.CreateJob(w, req)
+			router.ServeHTTP(w, req)
 
 			if tt.expectedErr {
 				assert.Equal(t, http.StatusBadRequest, w.Code)

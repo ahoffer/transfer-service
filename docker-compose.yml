@@ -1,5 +1,6 @@
 services:
-  app:
+  transfer:
+    container_name: transfer
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,6 +20,7 @@ services:
       - transfer-network
 
   db:
+    container_name: db
     image: postgres:16-alpine
     ports:
       - "5432:5432"

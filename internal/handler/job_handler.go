@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/transfer-service/internal/models"
 	"github.com/transfer-service/internal/service"
 )
@@ -20,128 +18,87 @@ type JobHandler struct {
 func NewJobHandler(jobService *service.JobService, baseURL string) *JobHandler {
 	return &JobHandler{
 		jobService: jobService,
-		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		baseURL:    baseURL,
 	}
 }
 
-func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h *JobHandler) CreateJob(c *gin.Context) {
 	var req models.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
 		return
 	}
 	if req.SourceUrl == "" {
-		http.Error(w, "SourceUrl is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "SourceUrl is required"})
 		return
 	}
 	if req.Destination == "" {
-		http.Error(w, "Destination is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Destination is required"})
 		return
 	}
 	if req.DestinationUrl == "" {
-		http.Error(w, "DestinationUrl is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "DestinationUrl is required"})
 		return
 	}
-
-	// Set the creation timestamp
-	req.CreatedAt = time.Now()
 
 	job, err := h.jobService.CreateJob(&req)
 	if err != nil {
-		http.Error(w, "Failed to create job", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create job"})
 		return
 	}
 
-	// Set Location header with full URL
-	location := fmt.Sprintf("/jobs/%d", job.ID)
-	w.Header().Set("Location", location)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(job); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	c.Header("Location", fmt.Sprintf("/jobs/%d", job.ID))
+	c.JSON(http.StatusCreated, job)
 }
 
-func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract job ID from URL path
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 3 {
-		http.Error(w, "Invalid job ID", http.StatusBadRequest)
-		return
-	}
-	jobID, err := strconv.ParseUint(pathParts[2], 10, 32)
+func (h *JobHandler) GetJob(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job ID"})
 		return
 	}
 
-	job, err := h.jobService.GetJob(uint(jobID))
+	job, err := h.jobService.GetJob(uint(id))
 	if err != nil {
-		http.Error(w, "Job not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(job); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-func (h *JobHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract job ID from URL path
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 {
-		http.Error(w, "Invalid job ID", http.StatusBadRequest)
-		return
-	}
-	jobID, err := strconv.ParseUint(pathParts[2], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid job ID", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.jobService.CancelJob(uint(jobID)); err != nil {
 		if err.Error() == "job not found" {
-			http.Error(w, "Job not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
 			return
 		}
-		http.Error(w, "Failed to cancel job", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get job"})
+		return
+	}
+
+	c.JSON(http.StatusOK, job)
+}
+
+func (h *JobHandler) CancelJob(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job ID"})
+		return
+	}
+
+	if err := h.jobService.CancelJob(uint(id)); err != nil {
+		if err.Error() == "job not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel job"})
 		return
 	}
 
 	// Get the updated job to return in response
-	job, err := h.jobService.GetJob(uint(jobID))
+	job, err := h.jobService.GetJob(uint(id))
 	if err != nil {
-		http.Error(w, "Failed to get updated job", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated job"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(job); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	c.JSON(http.StatusOK, job)
 }
